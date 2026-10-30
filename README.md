@@ -1,25 +1,39 @@
-# Household Water Tracker — Versions 1–3 feedback build
+# Household Water Tracker — Version 4
 
-## Run locally
-Open `index.html` in a modern browser. The app stores records in that browser's local storage; it does not sync between devices. PDF text extraction uses PDF.js from a CDN, so an internet connection is needed for automatic text extraction. PDF content is parsed in the browser and is not uploaded by the app. Photos/scanned bills can be previewed, but OCR is not included; enter those values manually.
+## What's new
+- Effective-dated tariff history: old rates are retained when new rates are added.
+- Mains daily usage tiers are applied progressively.
+- Recycled-water rates are applied by effective date.
+- Forecasts split the billing cycle across tariff effective dates.
+- Actual bill reconciliation estimates usage charges only when readings cover the complete invoice period.
+- Existing local data uses the same browser storage key and is migrated to schema version 4.
 
-## Deploy to Cloudflare Pages
-1. Create a private GitHub repository and upload `index.html` to its root.
-2. In Cloudflare, create a Pages project connected to that repository.
-3. Set the repository root as the output directory; no build command is required.
-4. Protect the deployed hostname with Cloudflare Access. A private source repository does not, on its own, make the deployed site private.
-5. Before replacing files or changing browser/device, export a JSON backup. The app remains local-first and does not synchronise data across devices.
+## Updating from Version 1–3
+1. Export a JSON backup from Backup & settings.
+2. Replace the repository's `index.html` with this package's `index.html` and commit.
+3. Wait for Cloudflare Pages to deploy.
+4. Open the same site in the same browser profile and confirm your readings and bills remain.
+5. Export a fresh JSON backup after confirming the migration.
 
-## Data and forecast behaviour
-- Invoice imports create/link meter observations at the period start and end and save the actual invoice record.
-- Re-importing a previously saved invoice is checked using invoice number and billing period/total; conflicting readings are rejected instead of silently overwritten.
-- If bills are imported out of chronological order, the provisional next cycle is based on the latest bill by billing-period end date rather than the last bill imported.
-- If no readings overlap a selected billing cycle, the dashboard uses the latest available measured consumption rate to produce a labelled trend-based estimate instead of displaying a false $0 forecast. If only part of a cycle is covered by readings, uncovered days are estimated from recent usage.
-- Forecasts are estimates, not invoices. Rate settings currently apply one active tier structure to the forecast; exact historic tariff segmentation is retained as bill text but is not yet a full effective-date tariff engine.
-- Chart choices (period, metric and date range) are saved locally. Cumulative meter totals remain selected when changing period granularity; period granularity is only applied to consumption charts.
-- After a successful invoice import, the entry form is cleared and a success message remains visible.
-- Chart symbols: actual readings are solid dots, calculated points are dotted-line-connected dots, and forecasts are stars. Missing consumption periods appear as gaps.
+## Tariff assumptions from your uploaded Yarra Valley Water bill
+The 28 August 2026 bill shows:
+- 28 May–27 August 2026: mains usage 48 kL, $188.67; recycled usage 2 kL, $4.00; total usage charges $192.67.
+- Before 1 July 2026: mains tier 1 $3.5724/kL; tier 2 $4.6871/kL; recycled $1.9681/kL.
+- From 1 July 2026: mains tier 1 $3.8313/kL; tier 2 $5.0268/kL; recycled $2.0133/kL.
+- The earlier third-tier rate is not shown on the bill. The app marks it unverified and retains $5.8403/kL from the previous configuration for the current period; verify it before relying on high-use forecasts.
 
-## Privacy and storage
-- All records remain in this browser unless exported. PDF.js is downloaded from a CDN; the bill text itself is processed in the browser.
-- Clear browser storage only after exporting a backup. The app does not currently offer encrypted cloud backup or multi-device sync.
+Forecasts are estimates, not invoices. Small differences from actual charges can result from tariff-day allocation, meter-read timing, rounding, fixed charges, credits, concessions or adjustments.
+
+## Multi-device data hosting
+Version 4 remains local-first. Cloudflare Pages hosts the website, but it does not synchronise browser storage between phone and laptop.
+
+Recommended architecture:
+- Cloudflare Pages: private HTTPS website hosting.
+- Supabase Auth: sign-in on each device.
+- Supabase Postgres: readings, invoices, bills, tariff versions and settings.
+- Supabase Storage: private invoice PDFs and meter photos.
+- Row Level Security: each signed-in user can access only their own records.
+
+A starter schema is provided in `supabase_schema.sql`. It uses one row per logical record, which is better suited to merging updates from two devices than overwriting one large JSON document. It also creates a private file bucket.
+
+Cloud sync is not connected in this Version 4 build. The next step is to create a Supabase project, apply the SQL, then add sign-in and conflict-safe sync. Do not put a Supabase secret/service-role key in browser code. Use only the publishable key with tested RLS policies.
